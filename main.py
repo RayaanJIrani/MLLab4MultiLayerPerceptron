@@ -8,7 +8,7 @@
 
 # ## Load, Split, and Balance
 
-# In[2]:
+# In[1]:
 
 
 #Import statements for the program 
@@ -23,7 +23,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 
-# In[3]:
+# In[2]:
 
 
 #Loads in all of the data into a Pandas Data Frame
@@ -51,7 +51,7 @@ print("Mean number of census tracts per county: " + str(np.mean(counts)))
 
 # Counites should be kept as a feature. This is becuase counties like states play a role in funding poverty relief programs. The extent to which these programs are funded is a result of the relative wealth of the county (as most county tax revenue is derived from property taxes). Due to this, it is possible that two census tracks that are very similar in other data types may differ greatly in poverty levels because one is surronded by a richer area and thus gets more county funding and the other does not. 
 
-# In[4]:
+# In[3]:
 
 
 # Create histogram of child poverty rates
@@ -63,7 +63,7 @@ plt.ylabel("Number of Census Tracts")
 
 # As can seen by the chart, the child poverty rates amongst census tracks do not follow a uniform or Gausian distribution. The data shows a mode near zero with the number of census tracks suffering a higher rates falling steadly from there. Due to the data being monomodal, there is no clear points to split the data into classes from Child Poverty Rates themselves. For this reason, we are spliting the data into classes each with an equal number of census tracks. This will allow us to use the full dataset for training and testing instead of having to throw away data to keep the classes balanced.
 
-# In[5]:
+# In[4]:
 
 
 # Discreatizing the Unemployment Variable into 4 classes, 0,1,2,3
@@ -86,7 +86,7 @@ y_test = np.array(y_test)
 
 # ## Initial Modeling
 
-# In[6]:
+# In[5]:
 
 
 # Example adapted from https://github.com/rasbt/python-machine-learning-book/blob/master/code/ch12/ch12.ipynb
@@ -276,7 +276,7 @@ class TwoLayerPerceptronBase(object):
         return self
 
 
-# In[7]:
+# In[6]:
 
 
 hyper_params = {'n_hidden': 30,
@@ -284,10 +284,14 @@ hyper_params = {'n_hidden': 30,
             'alpha': 0.001, 'decrease_const': 1e-5, 'minibatches': 50,
             'shuffle': True, 'random_state': 1}
 
+# In[7]:
+
+
+
 
 # This model is run without any scaling or one-hot encoding of the features. While the cost decreases slightly over the 100 epochs, the accuracy is very low. When testing the model, the model almost excusivley predicts a certain class for all of the data suggesting that the model is training to simply predict a certain class. Hopefully scaling the feature data can fix this issue.
 
-# In[9]:
+# In[8]:
 
 
 # Scaling the feature data that is fit X_train data
@@ -299,11 +303,17 @@ X_test_scl = X_test.copy()
 X_train_scl[:,2:] = scaler.fit_transform(X_train[:,2:])
 X_test_scl[:,2:] = scaler.fit_transform(X_test[:,2:])
 
+# Running with the same hyperparameters as above
+# In[9]:
+
+
+
+# In[10]:
 
 
 # The results remain pretty bad, the cost is still largely hovering in the same range across the epochs, although we are getting slightly more diversity in the outputs of the Perceptron now. This makes it seem like the single biggest issue with the data itself is that the large values of the label encoded categorical features, specifically county because it has so many unique values may be making the optimization very difficult for the network. Let's see if one hot encoding the categorical variables makes a difference.
 
-# In[12]:
+# In[11]:
 
 
 # Standard Scale X_train and X_test except for the first 2 columns
@@ -333,11 +343,18 @@ X_test_one_hot = enc.transform(X_test_one_hot).toarray()
 X_train_scl_one_hot = np.concatenate((X_train_one_hot,X_train_scl[:,2:]),axis=1)
 X_test_scl_one_hot = np.concatenate((X_test_one_hot,X_test_scl[:,2:]),axis=1)
 
+
+
+# In[12]:
+
+
+
+
 # One Hot encoding and scaling the features provides a huge boost in performance, and allows the network to actually train properly, as seen by how the loss converges in the graph above, as well as the much higher accuracy (much, much better than random chance, unlike the previous networks).  We theorize that this is likely due to the combination of scaling and one hot encoding simultaneous keeping the features in small ranges and preventing the network from learning incorrect ordinal patterns in the categorical data (A state encoded with a higher value isn't actually greater in any way). However, we think the single biggest factor is probably the fact that this keeps the dynamic ranges of all the variables constrained, and thus prevents bias among variables, and allows for the glorot initialization to be effective so that the activations do not saturate early (which can cause the Cross-Entropy loss and the gradients to become unstable).
 
 # ## Modeling
 
-# In[14]:
+# In[13]:
 
 
 # Using scaled and one-hot encoded data by default
@@ -345,7 +362,7 @@ X_train = X_train_scl_one_hot
 X_test = X_test_scl_one_hot
 
 
-# In[54]:
+# In[14]:
 
 
 # Example adapted from https://github.com/rasbt/python-machine-learning-book/blob/master/code/ch12/ch12.ipynb
@@ -456,7 +473,7 @@ class MultiLayerPerceptron(object):
         # First layer
         a = X.T
         
-        for i, W in enumerate(self.weights_):
+        for W in self.weights_:
             A.append(a)
             z = W @ a
             Z.append(z)
@@ -477,27 +494,23 @@ class MultiLayerPerceptron(object):
 
         # Reverse A:
         # Remove the FINAL element of A:
-
-
+        
         final = True
-        for a, w in zip(A[::-1], self.weights_[::-1]):
-            if final:
-                final = False
-                continue
+        for i in range(len(self.weights_)-1, -1, -1):
 
-            curr_grad = v @ a.T
+            curr_grad = v @ A[i].T
             # Adding Regularization:
-            curr_grad += w * self.l2_C
+            curr_grad += self.weights_[i] * self.l2_C
 
             curr_bias = np.sum(v, axis=1).reshape((-1,1))
 
             b_gradients.append(curr_bias)
             w_gradients.append(curr_grad)
 
-            v = a * (1-a) * (w.T @ v)
+            v = A[i] * (1-A[i]) * (self.weights_[i].T @ v)
 
-        w_gradients = w_gradients.reverse()
-        b_gradients = b_gradients.reverse()
+        w_gradients.reverse()
+        b_gradients.reverse()
 
         return w_gradients, b_gradients
     
@@ -517,6 +530,8 @@ class MultiLayerPerceptron(object):
         self.n_output_ = Y_enc.shape[0]
         self._initialize_weights()
 
+        #instantiating the list of arrays for storing the gradient magnitudes for each layer across each epoch
+        self.w_grad_ = [np.zeros(self.epochs, dtype=np.float64) for i in range(self.n_layers)]
         # start momentum at zero for previous updates
         rho_W_prev = []
         for w in self.weights_:
@@ -561,12 +576,15 @@ class MultiLayerPerceptron(object):
                 # compute gradient via backpropagation
                 w_gradients, b_gradients = self._get_gradient(A, Y_enc=Y_enc[:, idx])
 
+                for j in range(len(w_gradients)):
+                    self.w_grad_[j][i] = np.linalg.norm(w_gradients[j])
+
                 # momentum calculations
                 rho = [gradient*eta for gradient in w_gradients]
                 
-                for i in range(len(self.weights_)):
-                    self.weights_[i] -= (rho[i] + (self.alpha * rho_W_prev[i]))
-                    self.biases_[i] -= eta * b_gradients[i]
+                for w in range(len(self.weights_)):
+                    self.weights_[w] -= (rho[w] + (self.alpha * rho_W_prev[w]))
+                    self.biases_[w] -= eta * b_gradients[w]
                 rho_W_prev = rho
                 
 
@@ -578,13 +596,149 @@ class MultiLayerPerceptron(object):
         return self
 
 
-# In[55]:
+# ### 3 Layer Model
+
+# In[15]:
 
 
-model4 = MultiLayerPerceptron(epochs=30)
-model4.fit(X_train, y_train, print_progress=1, XY_test=(X_test,y_test))
+
+
+# ### AdaDelta model
+
+# In[37]:
+
+
+class AdaDeltaMLP(MultiLayerPerceptron):
+    def __init__(self, B1=.999, B2=.9, **kwargs):
+        super().__init__(**kwargs)
+        self.B1 = B1
+        self.B2 = B2
+
+    def fit(self, X, y, print_progress=False, XY_test=None):
+        """ Learn weights from training data. With mini-batch"""
+        X_data, y_data = X.copy(), y.copy()
+        Y_enc = self._encode_labels(y)
+        
+        # init weights and setup matrices
+        self.n_features_ = X_data.shape[1]
+        self.n_output_ = Y_enc.shape[0]
+        self._initialize_weights()
+
+        #instantiating the list of arrays for storing the gradient magnitudes for each layer across each epoch
+        self.w_grad_ = [np.zeros(self.epochs, dtype=np.float64) for i in range(self.n_layers)]
+        # start momentum at zero for previous updates
+        rho_W_prev = []
+        Vk_prev = []
+        Mk_prev = []
+        for w in self.weights_:
+            rho_W_prev.append(np.zeros(w.shape))
+        for w in self.weights_:
+            Vk_prev.append(np.zeros(w.shape))
+        for w in self.weights_:
+            Mk_prev.append(np.zeros(w.shape))
+        # Vk = Vk_prev
+        # Mk = Mk_prev
+        self.cost_ = []
+        self.score_ = []
+        # get starting acc
+        self.score_.append(accuracy_score(y_data,self.predict(X_data)))
+        # keep track of validation, if given
+        if XY_test is not None:
+            X_test = XY_test[0].copy()
+            y_test = XY_test[1].copy()
+            self.val_score_ = []
+            self.val_score_.append(accuracy_score(y_test,self.predict(X_test)))
+            
+        for i in range(self.epochs):
+
+            # adaptive learning rate
+            # \frac{\eta}{1+\epsilon\cdot k}
+            # eta = self.eta / (1 + self.decrease_const*i)
+
+            if print_progress>0 and (i+1)%print_progress==0:
+                sys.stderr.write('\rEpoch: %d/%d' % (i+1, self.epochs))
+                sys.stderr.flush()
+
+            if self.shuffle:
+                idx_shuffle = np.random.permutation(y_data.shape[0])
+                X_data, Y_enc, y_data = X_data[idx_shuffle], Y_enc[:, idx_shuffle], y_data[idx_shuffle]
+
+            mini = np.array_split(range(y_data.shape[0]), self.minibatches)
+            mini_cost = []
+            for idx in mini:
+
+                # feedforward
+                A, Z = self._feedforward(X_data[idx])
+                
+                cost = self._cost(A[-1], Y_enc[:, idx])
+
+                mini_cost.append(cost) # this appends cost of mini-batch only
+
+                # compute gradient via backpropagation
+                w_gradients, b_gradients = self._get_gradient(A, Y_enc=Y_enc[:, idx])
+
+                for j in range(len(w_gradients)):
+                    self.w_grad_[j][i] = np.linalg.norm(w_gradients[j])
+
+                # momentum calculations
+                rho = [gradient*self.eta for gradient in w_gradients]
+                
+                Gk = [gradient*gradient for gradient in w_gradients]
+                #Vk = self.ligma * Vk_prev + (1 - self.ligma) * Gk
+                Vk = Vk_prev
+                Mk = Mk_prev
+                for j,square_grad in enumerate(Gk):
+                    Vk[j] = self.B2 * Vk_prev[j] + (1-self.B2) * square_grad
+                
+                for j in range(len(w_gradients)):
+                    Mk[j] = self.B1 * Mk_prev[j] + (1-self.B1) * w_gradients[j]
+
+                for w in range(len(self.weights_)):
+                    self.weights_[w] -= self.eta * (Mk[w] / (np.sqrt(Vk[w] + 10e-8)))
+
+                    #self.weights_[w] -= (rho[w] + (self.alpha * rho_W_prev[w]))
+                    self.biases_[w] -= self.eta * b_gradients[w]
+                rho_W_prev = rho 
+                Vk_prev = Vk
+                Mk_prev = Mk
+
+            self.cost_.append(mini_cost)
+            self.score_.append(accuracy_score(y_data,self.predict(X_data)))
+            if XY_test is not None:
+                self.val_score_.append(accuracy_score(y_test,self.predict(X_test)))
+            
+        return self
+
+    
 
 
 # ## Exceptional Work
+
+# In[40]:
+
+
+
+hyper_params['epochs'] = 40
+model7 = AdaDeltaMLP(**hyper_params)
+model7.fit(X_train, y_train, print_progress=1, XY_test=(X_test,y_test))
+
+
+# In[41]:
+
+
+y_pred = model7.predict(X_test)
+print('Test accuracy: %.2f%%' % (accuracy_score(y_test, y_pred)*100))
+# print out the value counts of each item in y_pred_scl_one_hot:
+print("Value Counts of classes predicted: ")
+print(pd.Series(y_pred).value_counts())
+cost_avgs = np.mean(model7.cost_,axis=1)
+plt.plot(range(len(cost_avgs)), cost_avgs, color='red')
+plt.ylabel('Cost')
+plt.xlabel('Epochs')
+plt.title('Cost vs Epochs')
+plt.show()
+
+
+# 
 
 # 
